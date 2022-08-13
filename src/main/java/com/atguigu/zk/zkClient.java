@@ -58,6 +58,7 @@ public class zkClient {
     @Test
     public void getChildren() throws InterruptedException, KeeperException {
         //true  开启监听
+        //此处为true,监听使用的是init()方法中的new Watcher()监听
         List<String> children = zkClient.getChildren("/", true);
 
         for (String child: children) {
