@@ -21,9 +21,11 @@ public class DistributedLock {
     private final ZooKeeper zk ;
 
     private  CountDownLatch countDownLatch = new CountDownLatch(1);
+
+    //等待前一步骤完成之后，下一步骤才进行执行
     private  CountDownLatch waitLatch = new CountDownLatch(1);
 
-
+    //前一个节点的路径
     private String waitPath;
     private String currentMode;
 
@@ -34,24 +36,35 @@ public class DistributedLock {
         zk = new ZooKeeper(connectString, sessionTimeout, new Watcher() {
             @Override
             public void process(WatchedEvent watchedEvent) {
+
+                //监听器中判断释放的时机
+
+
             //countDownLatch 如果连接上zk 可以释放
+
+                //判断监听的事件的状态是否是连接
                 if(watchedEvent.getState() == Event.KeeperState.SyncConnected){
+                    //如果是，释放掉
                     countDownLatch.countDown();
                 }
 
                 //waitLatch 需要释放
+
+                //如果是节点的删除而且节点路径还是前一个节点路径，证明前一个节点已经下线
                 if(watchedEvent.getType() == Event.EventType.NodeDeleted && watchedEvent.getPath().equals(waitPath)){
                     waitLatch.countDown();
                 }
             }
         });
 
-        //等待zk正常连接后，往下走程序
+        //countDownLatch作用：等待zk正常连接后，程序才往下执行，代码健壮性更强
         countDownLatch.await();
 
         //判断根节点/locks是否存在
         Stat stat = zk.exists("/locks", false);
 
+
+        //对状态进行判断
         if(stat == null){
 
             //如果不存在，创建根节点
@@ -60,7 +73,7 @@ public class DistributedLock {
     }
 
 
-    //对zk加锁
+    //对zk加锁  ---其实就是在/locks目录下创建对应的临时带序号的节点
     public void zklock(){
         //创建对应的临时带序号节点
         try {
@@ -75,8 +88,13 @@ public class DistributedLock {
 
             //如果children只有一个值，那就直接获取锁；如果有多个节点，需要判断，谁最小；
             if(children.size() == 1){
+
+                //直接返回，获取锁
                 return;
             }else{
+                //有多个节点，需要取出来进行比较
+
+
                 //排序
                 Collections.sort(children);
 
@@ -90,11 +108,17 @@ public class DistributedLock {
                 if(index == -1){
                     System.out.println("数据异常");
                 }else if (index == 0){
-                    //就一个节点，可以获取锁了
+                    //就一个节点，直接返回，获取到锁
                     return ;
                 }else {
+                    //如果不是只有一个节点，就需要进行监听了
+
+
                     //需要监听 他前一个节点变化
+                    //waitpath:前一个节点的路径
                     waitPath = "/locks/"+children.get(index -1);
+
+                    //监听
                     zk.getData(waitPath,true,new Stat());
 
                     //等待监听
@@ -112,7 +136,7 @@ public class DistributedLock {
     }
 
 
-    //解锁
+    //解锁  --- 其实就是删除/locks目录下的临时节点
     public void unZklock(){
 
         //删除节点

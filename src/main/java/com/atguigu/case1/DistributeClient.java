@@ -35,11 +35,12 @@ public class DistributeClient {
 
     private void getServerList() throws InterruptedException, KeeperException {
 
+        //监听/servers这个节点下数据的变化，如果是true，表示使用的是getConnect()里面的监听器，否则需要我们自己创建
         List<String> children = zk.getChildren("/servers", true);
 
         ArrayList<String> servers = new ArrayList<>();
 
-        //遍历子节点，取出主机名称，封装到一个集合中进行打印（封装到集合中是为了方便打印）
+        //遍历子节点，取出主机名称，判断是否上下线，封装到一个集合中进行打印（封装到集合中是为了方便打印）
 
         for (String child : children) {
             byte[] data = zk.getData("/servers/" + child, false, null);
